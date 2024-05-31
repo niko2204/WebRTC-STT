@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC STT Example</title>
+    <style>
+        .highlight {
+            color: red;
+            font-weight: bold;
+        }
+        .container {
+            display: flex; /* flexbox 레이아웃을 사용 */
+        }
+
+        #videos {
+            width: 50%; /* 너비를 50%로 설정 */
+            height: 50vh;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #transcript {
+            width: 50%; /* 너비를 50%로 설정 */
+            color: black;
+            background-color: white;
+            padding: 10px;
+            font-size: 20px;
+            white-space: pre-wrap;
+            overflow: auto;
+            height: 70px;
+            direction: rtl;
+            text-align: left;
+            border:2px solid red;
+            z-index: 1;
+        }
+        #localVideo {
+            position: relative;
+            right: 0;
+            top: 0;
+            width: 30%;
+            height: auto;
+            border: 3px solid #fff;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebRTC STT Example</h1>
+    <div id="videos">
+        <video id="localVideo" autoplay></video>
+    </div>
+    <div id="transcript"></div>
+
+    <script>
+        // Get local video element
+        const localVideo = document.getElementById('localVideo');
+
+ // Get user media
+ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localVideo.srcObject = stream;
+
+                // SpeechRecognition 인스턴스 생성
+                const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition)();
+                recognition.lang = 'ko-KR'; // 언어를 한국어로 설정
+                recognition.interimResults = false; // 중간 결과 반환 안함
+                recognition.maxAlternatives = 1; // 반환할 최대 대체 결과 수
+
+                // 오디오 데이터를 SpeechRecognition에 전달
+                recognition.start();
+
+                recognition.onresult = function(event) {
+                    // 인식된 텍스트를 화면에 표시
+                    const transcriptDiv = document.getElementById('transcript');
+                    let transcript = 'local: '+event.results[0][0].transcript + '\n';
+
+                    // "혈압" 문자가 발견되면 색상을 변경
+                    transcript = transcript.replace(/혈압/g, '<span class="highlight">혈압</span>');
+                    transcriptDiv.innerHTML += transcript;
+
+                    // 스크롤 위치를 아래쪽으로 설정
+                    transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+                };
+
+                // 인식이 끝나면 다시 시작
+                recognition.onend = function() {
+                    recognition.start();
+                };
+            })
+            .catch(error => console.error('getUserMedia error:', error));
+    </script>
+</body>
+</html>

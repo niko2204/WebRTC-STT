@@ -1,0 +1,194 @@
+// server.js
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Example</title>
+    <style>
+        #videos {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+        #localVideo {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 320px;
+            height: 240px;
+            border: 3px solid #fff;
+            z-index: 1;
+        }
+        #remoteVideo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    #transcript {
+        color: black; /* 글씨 색상을 검정색으로 설정 */
+        background-color: white; /* 배경색을 흰색으로 설정 */
+        padding: 10px; /* 패딩을 10px로 설정 */
+        font-size: 20px;
+        white-space: pre-wrap; /* 줄바꿈을 유지 */
+    }
+    </style>
+</head>
+<body>
+    <h1>WebRTC Example</h1>
+    <div id="videos">
+        <video id="localVideo" autoplay></video>
+        <video id="remoteVideo" autoplay></video>
+
+        
+    </div>
+    
+    <button id="toggleButton">Toggle Video Size</button>
+    <div id="transcript"></div>
+
+    <script>
+        // Get local video element
+        const localVideo = document.getElementById('localVideo');
+        // Get remote video element
+        const remoteVideo = document.getElementById('remoteVideo');
+
+        // Create a new RTCPeerConnection
+        const peerConnection = new RTCPeerConnection();
+
+        const toggleButton = document.getElementById('toggleButton');
+        let isSmall = false;
+
+        // Add local video stream to the peer connection
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+                localVideo.srcObject = stream;
+            })
+            .catch(error => {
+                console.error('Error accessing media devices:', error);
+            });
+
+        // Set up event handler for ICE candidates
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+                // Send ICE candidate to the remote peer
+                socket.emit('iceCandidate', event.candidate);
+            }
+        };
+
+        // Set up event handler for remote stream
+        peerConnection.ontrack = event => {
+            // Add remote stream to the remote video element
+            remoteVideo.srcObject = event.streams[0];
+        };
+
+        // Set up event handler for socket.io events
+        socket.on('iceCandidate', candidate => {
+            // Add ICE candidate received from the remote peer
+            peerConnection.addIceCandidate(candidate);
+        });
+
+        // Set up event handler for socket.io connection
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            // Create an offer to start the WebRTC connection
+            peerConnection.createOffer()
+                .then(offer => {
+                    // Set local description of the offer
+                    peerConnection.setLocalDescription(offer);
+                    // Send the offer to the remote peer
+                    socket.emit('offer', offer);
+                })
+                .catch(error => {
+                    console.error('Error creating offer:', error);
+                });
+        });
+
+        // Set up event handler for socket.io disconnection
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        // Set up event handler for receiving offer from the remote peer
+        socket.on('offer', offer => {
+            console.log('Received offer from remote peer');
+            // Set remote description of the offer
+            peerConnection.setRemoteDescription(offer);
+            // Create an answer to the offer
+            peerConnection.createAnswer()
+                .then(answer => {
+                    // Set local description of the answer
+                    peerConnection.setLocalDescription(answer);
+                    // Send the answer to the remote peer
+                    socket.emit('answer', answer);
+                })
+                .catch(error => {
+                    console.error('Error creating answer:', error);
+                });
+        });
+
+        // Set up event handler for receiving answer from the remote peer
+        socket.on('answer', answer => {
+            console.log('Received answer from remote peer');
+            // Set remote description of the answer
+            peerConnection.setRemoteDescription(answer);
+        });
+
+
+    
+
+    toggleButton.addEventListener('click', () => {
+    if (!isSmall) {
+        remoteVideo.style.width = '320px';
+        remoteVideo.style.height = '240px';
+        videos.style.width = '320px';
+        videos.style.height = '240px';
+        toggleButton.style.backgroundColor = 'green';
+        toggleButton.style.color = 'green'
+    } else {
+        remoteVideo.style.width = '100%';
+        remoteVideo.style.height = '100%';
+        videos.style.width = '100%';
+        videos.style.height = '100%';
+        toggleButton.style.backgroundColor = 'red';
+        toggleButton.style.color = 'red'
+    }
+    isSmall = !isSmall;
+});   
+
+
+
+// Get user media
+navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localVideo.srcObject = stream;
+
+                // SpeechRecognition 인스턴스 생성
+                const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition)();
+                recognition.lang = 'ko-KR'; // 언어를 한국어로 설정
+                recognition.interimResults = false; // 중간 결과 반환 안함
+                recognition.maxAlternatives = 1; // 반환할 최대 대체 결과 수
+
+                // 오디오 데이터를 SpeechRecognition에 전달
+                recognition.start();
+
+                recognition.onresult = function(event) {
+                    // 인식된 텍스트를 화면에 표시
+                    const transcriptDiv = document.getElementById('transcript');
+                    transcriptDiv.textContent += event.results[0][0].transcript + '\n';
+                  //  transcriptDiv.innerHTML = event.results[0][0].transcript;
+
+                };
+
+                // 인식이 끝나면 다시 시작
+                recognition.onend = function() {
+                    recognition.start();
+                };
+            })
+            .catch(error => console.error('getUserMedia error:', error));
+
+    </script>
+</body>
+</html>
